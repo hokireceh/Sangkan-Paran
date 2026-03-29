@@ -179,6 +179,19 @@ async function kirimWisdomCard(chatId, tema, editMsgId = null) {
       },
     });
 
+    // Pesan teks terpisah — isi lengkap yang bisa di-copy
+    const kutipanLines = (content.kutipan_motivasi || '').split('\n').map(l => l.trim()).join('\n');
+    await bot.sendMessage(chatId,
+      `📋 *Salin teks kartu:*\n\n` +
+      `${kutipanLines}\n\n` +
+      `— ${content.kata_jawa} | ${content.arti_jawa} —\n\n` +
+      `${content.ayat_arab}\n` +
+      `[ ${content.transliterasi} ]\n` +
+      `"${content.arti_ayat}"\n\n` +
+      `${hashtagLine}`,
+      { parse_mode: 'Markdown' }
+    );
+
     if (loadingMsg) await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
     fs.unlinkSync(imagePath);
 

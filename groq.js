@@ -36,9 +36,9 @@ OUTPUT: HANYA JSON valid berikut, tanpa teks lain apapun di luar JSON.
   "transliterasi": "transliterasi latin tanpa tanda kurung",
   "arti_ayat": "terjemahan singkat bahasa Indonesia",
   "photo_queries": [
-    "bright airy [scene relevan tema] soft natural light minimal",
-    "soft morning light [scene relevan tema] clean aesthetic",
-    "light neutral [scene relevan tema] minimalist calm"
+    "GANTI: scene Indonesia/Jawa relevan tema ini, terang, airy, soft light",
+    "GANTI: scene alternatif Indonesia/Jawa berbeda, bright, minimal",
+    "GANTI: scene fallback alam Jawa umum, morning, calm"
   ],
   "hashtags": [
     "TagPertama",
@@ -55,7 +55,7 @@ ATURAN WAJIB:
 1. kutipan_motivasi: WAJIB dalam bahasa Jawa ngoko atau krama (BUKAN bahasa Indonesia), per baris pendek, puitis, menyentuh hati. Contoh untuk tema sabar: "alon-alon waton kelakon\nora susah kesusu\nnrima ing pandum\nwiting tresna jalaran saka kulina"
 2. kata_jawa: kata Jawa autentik yang relevan tema
 3. ayat_arab: ayat/hadits sahih yang benar-benar relevan
-4. photo_queries: WAJIB scene visual nyata dalam bahasa Inggris, HARUS mengandung kata kunci estetika terang seperti: "bright", "soft light", "airy", "minimal", "clean", "morning light", "neutral", "light". HINDARI kata: "dark", "night", "moody", "dramatic", "stormy". Contoh untuk tema sabar: "bright minimal window soft morning light", "soft neutral prayer mat clean aesthetic", "airy light flowing water calm minimal"
+4. photo_queries: WAJIB scene visual nyata dalam bahasa Inggris, HARUS bernuansa Jawa/Indonesia (sawah, masjid, gunung, pasar tradisional, sungai Jawa, dll) DAN mengandung kata estetika terang: "bright", "soft light", "airy", "minimal", "clean", "morning". HINDARI: "dark", "night", "moody", "foreign", "western". Contoh untuk tema sabar: "bright Java rice field morning mist minimal", "soft light Indonesian mosque prayer hall", "airy Javanese river stones calm morning"
 5. hashtags: 7 string tanpa spasi tanpa #, campur Indonesia+Inggris, relevan tema, berpotensi viral di medsos. Contoh untuk sabar: ["KataSabar","SabarItuIndah","Patience","QuoteSabar","MotivasiIslam","HidupSabar","IslamicQuotes"]
 6. Semua nilai string harus VALID JSON — tidak boleh ada karakter yang merusak JSON`;
 }
