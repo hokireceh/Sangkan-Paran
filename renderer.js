@@ -29,12 +29,14 @@ function calcKutipanFontSize(text = '') {
 }
 
 // ─── Render kartu → PNG ───────────────────────────────────────────────────────
-async function renderCard(content) {
-  let photoUrl = '';
-  try {
-    photoUrl = await fetchUnsplashPhoto(content.photo_queries || content.unsplash_keyword);
-  } catch (e) {
-    console.warn('[WARN] Unsplash failed, card tanpa foto');
+async function renderCard(content, photoUrlOverride) {
+  let photoUrl = photoUrlOverride || '';
+  if (!photoUrl) {
+    try {
+      photoUrl = await fetchUnsplashPhoto(content.photo_queries || content.unsplash_keyword);
+    } catch (e) {
+      console.warn('[WARN] Unsplash failed, card tanpa foto');
+    }
   }
 
   const html = generateCardHTML(content, photoUrl);
