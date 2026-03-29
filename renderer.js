@@ -140,22 +140,22 @@ function generateCardHTML(content, photoUrl) {
   /* ── Foto bingkai putih krem ─────────────────── */
   .photo-wrap {
     z-index: 1;
-    margin-bottom: 30px;
+    margin-bottom: 36px;
     background: #f0e6cc;
     padding: 10px;
-    box-shadow: 0 2px 8px rgba(60,30,5,0.25), 0 0 0 1px rgba(80,45,10,0.12);
-    width: 520px;
+    box-shadow: 0 4px 16px rgba(60,30,5,0.30), 0 0 0 1px rgba(80,45,10,0.15);
+    width: 540px;
   }
   .photo-wrap img {
     width: 100%;
-    height: 240px;
+    height: 300px;
     object-fit: cover;
     display: block;
-    filter: sepia(40%) contrast(0.88) brightness(0.92) saturate(0.85);
+    filter: contrast(0.95) brightness(0.97);
   }
   .photo-placeholder {
     width: 100%;
-    height: 240px;
+    height: 300px;
     background: #b8954f;
     display: flex;
     align-items: center;
@@ -172,15 +172,16 @@ function generateCardHTML(content, photoUrl) {
   .kutipan {
     z-index: 1;
     width: 100%;
-    margin-bottom: 12px;
+    margin-bottom: 20px;
     text-align: center;
   }
   .kutipan-text {
     font-family: 'Lora', serif;
     font-weight: 700;
     color: #1c0c00;
-    line-height: 1.65;
+    line-height: 1.75;
     white-space: pre-wrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.12);
     /* font-size diinjeksi via inline style */
   }
 
@@ -188,25 +189,25 @@ function generateCardHTML(content, photoUrl) {
   .kata-jawa-wrap {
     z-index: 1;
     width: 100%;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
     text-align: center;
     border-top: 1px solid rgba(70,38,5,0.20);
     border-bottom: 1px solid rgba(70,38,5,0.20);
-    padding: 8px 0;
+    padding: 12px 0;
   }
   .kata-jawa-label {
     font-family: 'Cinzel', serif;
-    font-size: 15px;
+    font-size: 19px;
     font-weight: 600;
     color: #2c1600;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
   }
   .kata-jawa-arti {
     font-family: 'Lora', serif;
-    font-size: 13px;
+    font-size: 14px;
     font-style: italic;
     color: #5a3510;
-    margin-top: 3px;
+    margin-top: 5px;
   }
 
   /* ── Divider ornament ────────────────────────── */
@@ -216,7 +217,7 @@ function generateCardHTML(content, photoUrl) {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 16px 0;
+    margin: 22px 0;
   }
   .divider-line {
     flex: 1;
