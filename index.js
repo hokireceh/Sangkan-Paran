@@ -1,53 +1,109 @@
+'use strict';
+
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { generateWisdomContent } = require('./groq');
-const { renderCard } = require('./renderer');
-const fs = require('fs');
+const { renderCard }            = require('./renderer');
+const fs                        = require('fs');
+
+// ─── Whitelist dari .env ──────────────────────────────────────────────────────
+// Isi ALLOWED_IDS di .env dengan Telegram user ID, pisah koma
+// Contoh: ALLOWED_IDS=123456789,987654321
+const ALLOWED_IDS = new Set(
+  (process.env.ALLOWED_IDS || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean)
+    .map(Number)
+);
+
+function isAllowed(chatId) {
+  return ALLOWED_IDS.has(Number(chatId));
+}
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 console.log('🤖 Sangkan Paran Bot is running...');
+console.log(`🔒 Whitelist aktif: ${ALLOWED_IDS.size} user diizinkan`);
+
+// ─── Global error handler — cegah bot mati saat polling error ────────────────
+bot.on('polling_error', (err) => {
+  console.error('[POLLING ERROR]', err.code, err.message?.slice(0, 120));
+});
+bot.on('error', (err) => {
+  console.error('[BOT ERROR]', err.message?.slice(0, 120));
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+});
+
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+async function shutdown(signal) {
+  console.log(`\n[INFO] ${signal} diterima — menghentikan bot...`);
+  await bot.stopPolling();
+  console.log('[INFO] Bot berhenti.');
+  process.exit(0);
+}
+process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // ─── State per user ───────────────────────────────────────────────────────────
-const userState = new Map();
+const userState = new Map();   // chatId → state string
 
-// ─── ★ Cooldown anti-spam (10 detik per user) ─────────────────────────────────
-const COOLDOWN_MS = 10_000;
-const lastRequest = new Map(); // chatId → timestamp
+// ─── Cooldown anti-spam ───────────────────────────────────────────────────────
+const COOLDOWN_MS = 12_000;
+const lastRequest = new Map();
 
 function isOnCooldown(chatId) {
   const last = lastRequest.get(chatId);
-  if (!last) return false;
-  return (Date.now() - last) < COOLDOWN_MS;
+  return last ? (Date.now() - last) < COOLDOWN_MS : false;
 }
-
-function setCooldown(chatId) {
-  lastRequest.set(chatId, Date.now());
-}
-
+function setCooldown(chatId)   { lastRequest.set(chatId, Date.now()); }
 function cooldownSisa(chatId) {
   const last = lastRequest.get(chatId);
   if (!last) return 0;
-  return Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 1000);
+  const sisa = Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 1000);
+  return sisa > 0 ? sisa : 0;
 }
 
-// ─── ★ History tema per user (simpan 20 tema terakhir) ────────────────────────
+// ─── Per-user request lock ────────────────────────────────────────────────────
+const processingLock = new Set();
+
+function acquireLock(chatId) {
+  if (processingLock.has(chatId)) return false;
+  processingLock.add(chatId);
+  return true;
+}
+function releaseLock(chatId) { processingLock.delete(chatId); }
+
+// ─── Helper: tolak cooldown ───────────────────────────────────────────────────
+async function rejectCooldown(chatId, queryId = null) {
+  const sisa = cooldownSisa(chatId);
+  if (queryId) {
+    return bot.answerCallbackQuery(queryId, {
+      text: `⏱ Sabar sebentar ya! Tunggu ${sisa} detik lagi. 🙏`,
+      show_alert: true,
+    });
+  }
+  return bot.sendMessage(chatId,
+    `⏱ Sabar sebentar ya! Tunggu *${sisa} detik* lagi sebelum request berikutnya. 🙏`,
+    { parse_mode: 'Markdown' }
+  );
+}
+
+// ─── History tema per user ────────────────────────────────────────────────────
 const MAX_HISTORY = 20;
-const userHistory = new Map(); // chatId → [{ tema, waktu }]
+const userHistory = new Map();
 
 function addHistory(chatId, tema) {
   if (!userHistory.has(chatId)) userHistory.set(chatId, []);
   const hist = userHistory.get(chatId);
-  // Hindari duplikat berturutan
   if (hist.length > 0 && hist[hist.length - 1].tema === tema) return;
   hist.push({ tema, waktu: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) });
   if (hist.length > MAX_HISTORY) hist.shift();
 }
+function getHistory(chatId) { return userHistory.get(chatId) || []; }
 
-function getHistory(chatId) {
-  return userHistory.get(chatId) || [];
-}
-
-// ─── Tema Registry (atasi batas 64 byte callback_data Telegram) ───────────────
+// ─── Tema Registry ────────────────────────────────────────────────────────────
 const temaRegistry = new Map();
 let temaCounter = 0;
 
@@ -58,16 +114,31 @@ function registerTema(tema) {
   }
   const key = String(temaCounter++);
   temaRegistry.set(key, tema);
-  if (temaRegistry.size > 200) {
-    temaRegistry.delete(temaRegistry.keys().next().value);
-  }
+  if (temaRegistry.size > 200) temaRegistry.delete(temaRegistry.keys().next().value);
   return `ref:${key}`;
 }
-
 function resolveTema(raw) {
   if (raw.startsWith('ref:')) return temaRegistry.get(raw.slice(4)) || 'random';
   return raw;
 }
+
+// ─── Periodic cleanup stale Maps ─────────────────────────────────────────────
+const STALE_TTL = 1000 * 60 * 60 * 24;
+
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [chatId, ts] of lastRequest) {
+    if (now - ts > STALE_TTL) { lastRequest.delete(chatId); cleaned++; }
+  }
+  for (const chatId of userState.keys()) {
+    if (!lastRequest.has(chatId)) { userState.delete(chatId); cleaned++; }
+  }
+  for (const chatId of userHistory.keys()) {
+    if (!lastRequest.has(chatId)) { userHistory.delete(chatId); cleaned++; }
+  }
+  if (cleaned > 0) console.log(`[CLEANUP] Hapus ${cleaned} entri stale dari Maps`);
+}, 1000 * 60 * 60);
 
 // ─── Tema Kategori ────────────────────────────────────────────────────────────
 const TEMA_KATEGORI = {
@@ -116,53 +187,34 @@ function temaInlineKeyboard() {
 
 // ─── Helper: kirim Wisdom Card ────────────────────────────────────────────────
 async function kirimWisdomCard(chatId, tema, editMsgId = null) {
+  let loadingMsg = editMsgId ? { message_id: editMsgId } : null;
+  let imagePath  = null;
 
-  // ★ Cek cooldown
-  if (isOnCooldown(chatId)) {
-    const sisa = cooldownSisa(chatId);
-    return bot.sendMessage(chatId,
-      `⏱ Sabar sebentar ya! Tunggu *${sisa} detik* lagi sebelum request berikutnya. 🙏`,
-      { parse_mode: 'Markdown' }
-    );
-  }
-  setCooldown(chatId);
-
-  let loadingMsg;
   try {
-    await bot.sendChatAction(chatId, 'upload_photo');
+    await bot.sendChatAction(chatId, 'upload_photo').catch(() => {});
 
-    if (editMsgId) {
-      await bot.editMessageText(
-        `⏳ Membuat Wisdom Card *"${tema}"*...\nMohon tunggu 🙏`,
-        { chat_id: chatId, message_id: editMsgId, parse_mode: 'Markdown' }
-      ).catch(() => {});
-      loadingMsg = { message_id: editMsgId };
-    } else {
+    if (!editMsgId) {
       loadingMsg = await bot.sendMessage(chatId,
         `⏳ Membuat Wisdom Card *"${tema}"*...\nMohon tunggu 🙏`,
         { parse_mode: 'Markdown' }
       );
     }
 
-    // Generate konten & render
     const content = await generateWisdomContent(tema);
     console.log(`[INFO] Content (${content.tema}):`, JSON.stringify(content, null, 2));
 
-    const imagePath = await renderCard(content);
+    imagePath = await renderCard(content);
     console.log('[INFO] Card rendered:', imagePath);
 
-    // ★ Simpan ke history setelah berhasil
     const temaAktual = content.tema || tema;
     addHistory(chatId, temaAktual);
     console.log(`[HISTORY] ${chatId} → ${temaAktual} (total: ${getHistory(chatId).length})`);
 
-    await bot.sendChatAction(chatId, 'upload_photo');
+    await bot.sendChatAction(chatId, 'upload_photo').catch(() => {});
 
-    // Caption + hashtag
-    const BRAND_TAGS = ['SangkanParan', 'fyp'];
-    const allTags    = [...(content.hashtags || []).slice(0, 3), ...BRAND_TAGS];
+    const BRAND_TAGS  = ['SangkanParan', 'fyp'];
+    const allTags     = [...(content.hashtags || []).slice(0, 3), ...BRAND_TAGS];
     const hashtagLine = allTags.map(h => `#${h}`).join(' ');
-
     const kutipanLines = (content.kutipan_motivasi || '')
       .split('\n').map(l => l.trim()).join('\n');
 
@@ -182,24 +234,32 @@ async function kirimWisdomCard(chatId, tema, editMsgId = null) {
     });
 
     if (loadingMsg) await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
-    fs.unlinkSync(imagePath);
 
   } catch (error) {
-    console.error('[ERROR]', error);
-    const errText = `❌ Gagal membuat kartu *"${tema}"*.\nSilakan coba tema lain.`;
+    console.error('[ERROR] kirimWisdomCard:', error.message || error);
+
+    const errText = `❌ Gagal membuat kartu *"${tema}"*.\nSilakan coba tema lain atau tunggu sebentar.`;
     if (loadingMsg) {
       await bot.editMessageText(errText, {
-        chat_id: chatId, message_id: loadingMsg.message_id, parse_mode: 'Markdown',
+        chat_id   : chatId,
+        message_id: loadingMsg.message_id,
+        parse_mode: 'Markdown',
       }).catch(() => bot.sendMessage(chatId, errText, { parse_mode: 'Markdown' }));
     } else {
       await bot.sendMessage(chatId, errText, { parse_mode: 'Markdown' });
     }
+
+  } finally {
+    if (imagePath) { try { fs.unlinkSync(imagePath); } catch (_) {} }
+    releaseLock(chatId);
   }
 }
 
 // ─── /start ───────────────────────────────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
+  if (!isAllowed(chatId)) return; // ← whitelist check
+
   const nama = msg.from?.first_name || 'Sahabat';
   userState.delete(chatId);
 
@@ -213,7 +273,10 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ─── /help ────────────────────────────────────────────────────────────────────
-bot.onText(/\/help/, (msg) => handleHelp(msg.chat.id));
+bot.onText(/\/help/, (msg) => {
+  if (!isAllowed(msg.chat.id)) return; // ← whitelist check
+  handleHelp(msg.chat.id);
+});
 
 function handleHelp(chatId) {
   userState.delete(chatId);
@@ -237,8 +300,10 @@ bot.on('message', async (msg) => {
   if (!msg.text || msg.text.startsWith('/')) return;
 
   const chatId = msg.chat.id;
-  const teks   = msg.text.trim();
-  const state  = userState.get(chatId);
+  if (!isAllowed(chatId)) return; // ← whitelist check
+
+  const teks  = msg.text.trim();
+  const state = userState.get(chatId);
 
   // ── Buat Wisdom Card ──
   if (teks === MENU.BUAT_CARD) {
@@ -264,10 +329,13 @@ bot.on('message', async (msg) => {
   // ── Random Card ──
   if (teks === MENU.RANDOM) {
     userState.delete(chatId);
+    if (isOnCooldown(chatId)) return rejectCooldown(chatId);
+    if (!acquireLock(chatId)) return rejectCooldown(chatId);
+    setCooldown(chatId);
     return kirimWisdomCard(chatId, 'random');
   }
 
-  // ── ★ Riwayat Tema ──
+  // ── Riwayat Tema ──
   if (teks === MENU.HISTORY) {
     userState.delete(chatId);
     const hist = getHistory(chatId);
@@ -279,11 +347,8 @@ bot.on('message', async (msg) => {
       );
     }
 
-    // Tampilkan 10 terakhir, terbaru di atas
-    const list = [...hist].reverse().slice(0, 10);
+    const list      = [...hist].reverse().slice(0, 10);
     const teks_hist = list.map((h, i) => `${i + 1}. *${h.tema}* — _${h.waktu}_`).join('\n');
-
-    // Inline keyboard dari riwayat: buat ulang tema-tema terakhir
     const inlineRows = [];
     let row = [];
     list.slice(0, 6).forEach((h, i) => {
@@ -296,10 +361,7 @@ bot.on('message', async (msg) => {
 
     return bot.sendMessage(chatId,
       `📜 *Riwayat Tema Kamu* (${hist.length} tema)\n\n${teks_hist}\n\n_Ketuk untuk buat ulang:_`,
-      {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: inlineRows },
-      }
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: inlineRows } }
     );
   }
 
@@ -344,6 +406,9 @@ bot.on('message', async (msg) => {
   // ── State: menunggu input tema ──
   if (state === 'waiting_tema') {
     userState.delete(chatId);
+    if (isOnCooldown(chatId)) return rejectCooldown(chatId);
+    if (!acquireLock(chatId)) return rejectCooldown(chatId);
+    setCooldown(chatId);
     return kirimWisdomCard(chatId, teks);
   }
 
@@ -366,15 +431,19 @@ bot.on('message', async (msg) => {
 
 // ─── Callback Query ───────────────────────────────────────────────────────────
 bot.on('callback_query', async (query) => {
-  const chatId = query.message.chat.id;
-  const msgId  = query.message.message_id;
-  const data   = query.data;
+  const chatId  = query.message.chat.id;
+  const msgId   = query.message.message_id;
+  const data    = query.data;
+  const queryId = query.id;
 
-  await bot.answerCallbackQuery(query.id);
+  if (!isAllowed(chatId)) return bot.answerCallbackQuery(queryId); // ← whitelist check
 
-  if (data === 'noop') return;
+  if (data === 'noop') {
+    return bot.answerCallbackQuery(queryId);
+  }
 
   if (data === 'menu:tema') {
+    await bot.answerCallbackQuery(queryId);
     await bot.editMessageText(
       `📂 *Pilih Tema Wisdom Card*\n\nKetuk tema yang kamu inginkan:`,
       { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: temaInlineKeyboard() }
@@ -387,20 +456,34 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  if (data.startsWith('tema:')) {
-    const tema  = resolveTema(data.replace('tema:', ''));
-    const label = tema.length > 40 ? tema.slice(0, 40) + '…' : tema;
-    await bot.editMessageText(
-      `⏳ Membuat Wisdom Card *"${label}"*...\nMohon tunggu 🙏`,
-      { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' }
-    ).catch(() => {});
-    await kirimWisdomCard(chatId, tema, msgId);
+  if (data.startsWith('tema:') || data.startsWith('ulang:')) {
+    if (isOnCooldown(chatId)) return rejectCooldown(chatId, queryId);
+    if (!acquireLock(chatId)) {
+      return bot.answerCallbackQuery(queryId, {
+        text: '⏳ Masih memproses permintaan sebelumnya, tunggu sebentar...',
+        show_alert: true,
+      });
+    }
+
+    await bot.answerCallbackQuery(queryId);
+    setCooldown(chatId);
+
+    const prefix = data.startsWith('tema:') ? 'tema:' : 'ulang:';
+    const tema   = resolveTema(data.replace(prefix, ''));
+    const label  = tema.length > 40 ? tema.slice(0, 40) + '…' : tema;
+
+    if (data.startsWith('tema:')) {
+      await bot.editMessageText(
+        `⏳ Membuat Wisdom Card *"${label}"*...\nMohon tunggu 🙏`,
+        { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' }
+      ).catch(() => {});
+      await kirimWisdomCard(chatId, tema, msgId);
+    } else {
+      await kirimWisdomCard(chatId, tema);
+    }
     return;
   }
 
-  if (data.startsWith('ulang:')) {
-    const tema = resolveTema(data.replace('ulang:', ''));
-    await kirimWisdomCard(chatId, tema);
-    return;
-  }
+  // Fallback
+  await bot.answerCallbackQuery(queryId);
 });

@@ -1,6 +1,8 @@
-const puppeteer = require('puppeteer');
-const path = require('path');
-const fs = require('fs');
+'use strict';
+
+const puppeteer   = require('puppeteer');
+const path        = require('path');
+const fs          = require('fs');
 const { execSync } = require('child_process');
 const { fetchUnsplashPhoto } = require('./unsplash');
 
@@ -17,8 +19,17 @@ function findChromium() {
 const CHROMIUM_PATH = findChromium();
 console.log('[INFO] Chromium path:', CHROMIUM_PATH || '(puppeteer bundled)');
 
+// ─── HTML escape — cegah content AI merusak struktur kartu ───────────────────
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;')
+    .replace(/'/g,  '&#39;');
+}
+
 // ─── Auto font-size kutipan ───────────────────────────────────────────────────
-// Makin panjang teks / makin banyak baris → font makin kecil otomatis
 function calcKutipanFontSize(text = '') {
   const lines  = text.split('\n');
   const maxLen = Math.max(...lines.map(l => l.length));
@@ -28,6 +39,11 @@ function calcKutipanFontSize(text = '') {
   return '26px';
 }
 
+// ─── Unique ID — aman untuk request bersamaan ─────────────────────────────────
+function makeUid() {
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
 // ─── Render kartu → PNG ───────────────────────────────────────────────────────
 async function renderCard(content, photoUrlOverride) {
   let photoUrl = photoUrlOverride || '';
@@ -35,15 +51,16 @@ async function renderCard(content, photoUrlOverride) {
     try {
       photoUrl = await fetchUnsplashPhoto(content.photo_queries || content.unsplash_keyword);
     } catch (e) {
-      console.warn('[WARN] Unsplash failed, card tanpa foto');
+      console.warn('[WARN] Unsplash failed, card tanpa foto:', e.message);
     }
   }
 
-  const html = generateCardHTML(content, photoUrl);
+  const html        = generateCardHTML(content, photoUrl);
+  const uid         = makeUid();
+  const tmpHtmlPath = path.join('/tmp', `card_${uid}.html`);
+  const tmpPngPath  = path.join('/tmp', `card_${uid}.png`);
 
-  const tmpHtmlPath = path.join('/tmp', `card_${Date.now()}.html`);
-  const tmpPngPath  = path.join('/tmp', `card_${Date.now()}.png`);
-  fs.writeFileSync(tmpHtmlPath, html);
+  fs.writeFileSync(tmpHtmlPath, html, 'utf8');
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -57,18 +74,21 @@ async function renderCard(content, photoUrlOverride) {
     ],
   });
 
-  const page = await browser.newPage();
-  await page.setViewport({ width: 800, height: 1200, deviceScaleFactor: 2 });
-  await page.goto(`file://${tmpHtmlPath}`, { waitUntil: 'networkidle0', timeout: 30000 });
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 800, height: 1200, deviceScaleFactor: 2 });
+    await page.goto(`file://${tmpHtmlPath}`, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.screenshot({
+      path    : tmpPngPath,
+      fullPage: false,
+      clip    : { x: 0, y: 0, width: 800, height: 1200 },
+    });
+  } finally {
+    // Selalu tutup browser & hapus file HTML — bahkan saat error
+    await browser.close();
+    try { fs.unlinkSync(tmpHtmlPath); } catch (_) {}
+  }
 
-  await page.screenshot({
-    path: tmpPngPath,
-    fullPage: false,
-    clip: { x: 0, y: 0, width: 800, height: 1200 },
-  });
-
-  await browser.close();
-  fs.unlinkSync(tmpHtmlPath);
   return tmpPngPath;
 }
 
@@ -76,6 +96,15 @@ async function renderCard(content, photoUrlOverride) {
 function generateCardHTML(content, photoUrl) {
   const hasPhoto    = !!photoUrl;
   const kutipanSize = calcKutipanFontSize(content.kutipan_motivasi || '');
+
+  // Escape semua field teks — aksara Arab tidak perlu di-escape (Unicode murni)
+  const kutipan      = escapeHtml(content.kutipan_motivasi);
+  const kataJawa     = escapeHtml(content.kata_jawa);
+  const artiJawa     = escapeHtml(content.arti_jawa);
+  const translitasi  = escapeHtml(content.transliterasi);
+  const artiAyat     = escapeHtml(content.arti_ayat);
+  // ayat_arab: aksara Arab aman, hanya escape karakter berbahaya saja
+  const ayatArab     = String(content.ayat_arab ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -142,7 +171,7 @@ function generateCardHTML(content, photoUrl) {
     letter-spacing: 1.5px;
   }
 
-  /* ── Foto bingkai putih — sekarang thumbnail kecil di tengah ── */
+  /* ── Foto bingkai putih ── */
   .photo-wrap {
     z-index: 2;
     margin-bottom: 36px;
@@ -307,13 +336,13 @@ function generateCardHTML(content, photoUrl) {
 
   <!-- Kutipan Jawa -->
   <div class="kutipan">
-    <div class="kutipan-text" style="font-size:${kutipanSize}">${content.kutipan_motivasi}</div>
+    <div class="kutipan-text" style="font-size:${kutipanSize}">${kutipan}</div>
   </div>
 
   <!-- Kata Jawa -->
   <div class="kata-jawa-wrap">
-    <div class="kata-jawa-label">${content.kata_jawa}</div>
-    <div class="kata-jawa-arti">${content.arti_jawa}</div>
+    <div class="kata-jawa-label">${kataJawa}</div>
+    <div class="kata-jawa-arti">${artiJawa}</div>
   </div>
 
   <!-- Divider -->
@@ -325,9 +354,9 @@ function generateCardHTML(content, photoUrl) {
 
   <!-- Arab -->
   <div class="arab-section">
-    <div class="arab-text">${content.ayat_arab}</div>
-    <div class="transliterasi">[ ${content.transliterasi} ]</div>
-    <div class="arti-ayat">"${content.arti_ayat}"</div>
+    <div class="arab-text">${ayatArab}</div>
+    <div class="transliterasi">[ ${translitasi} ]</div>
+    <div class="arti-ayat">"${artiAyat}"</div>
   </div>
 
   <!-- Footer -->
