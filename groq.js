@@ -22,8 +22,16 @@ const RANDOM_THEMES = [
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 function buildPrompt(tema) {
-  return `Kamu adalah ahli filosofi Jawa dan Islam sekaligus direktur kreatif visual.
+  return `Kamu adalah sesepuh Jawa yang hafal ribuan petuah, paribasan, dan falsafah Jawa asli.
 Buatkan konten Wisdom Card "Sangkan Paran" untuk tema: "${tema}".
+
+Referensi gaya petuah Jawa asli yang menjadi inspirasimu:
+"urip iku urup" | "jer basuki mawa bea" | "becik ketitik ala ketara" | "aja dumeh" |
+"sepi ing pamrih rame ing gawe" | "sopo nandur bakal ngunduh" | "rukun agawe santosa" |
+"nrimo ing pandum" | "sugih tanpa bandha" | "eling lan waspada" |
+"alon-alon waton kelakon" | "witing tresna jalaran saka kulina" |
+"esuk dhele sore tempe" | "aja ngaya, ngaya bakal raya" |
+"sak bejo-bejone wong lali isih bejo kang eling" | "mikul dhuwur mendhem jero"
 
 OUTPUT: HANYA JSON valid berikut, tanpa teks lain apapun di luar JSON.
 
@@ -52,7 +60,7 @@ OUTPUT: HANYA JSON valid berikut, tanpa teks lain apapun di luar JSON.
 }
 
 ATURAN WAJIB:
-1. kutipan_motivasi: WAJIB dalam bahasa Jawa ngoko atau krama (BUKAN bahasa Indonesia), per baris pendek, puitis, menyentuh hati. Contoh untuk tema sabar: "alon-alon waton kelakon\nora susah kesusu\nnrima ing pandum\nwiting tresna jalaran saka kulina"
+1. kutipan_motivasi: WAJIB gaya petuah/paribasan Jawa asli yang terdengar natural dan manusiawi — BUKAN kalimat motivasi AI yang kaku. Gunakan diksi Jawa ngoko yang sederhana, berirama, dan langsung ke hati. Hindari frasa generik seperti "tetap semangat", "jaga hati", "ikhtiar terbaik". Contoh gaya BENAR: "urip iku urup\nsepi ing pamrih rame ing gawe\nsopo nandur bakal ngunduh\nbecik ketitik ala ketara" — Contoh gaya SALAH (jangan): "tansah istiqomah\nlako ing kahanan\naja tansah tetep"
 2. kata_jawa: kata Jawa autentik yang relevan tema
 3. ayat_arab: ayat/hadits sahih yang benar-benar relevan
 4. photo_queries: WAJIB scene visual nyata dalam bahasa Inggris, HARUS bernuansa Jawa/Indonesia (sawah, masjid, gunung, pasar tradisional, sungai Jawa, dll) DAN mengandung kata estetika terang: "bright", "soft light", "airy", "minimal", "clean", "morning". HINDARI: "dark", "night", "moody", "foreign", "western". Contoh untuk tema sabar: "bright Java rice field morning mist minimal", "soft light Indonesian mosque prayer hall", "airy Javanese river stones calm morning"
