@@ -64,7 +64,7 @@ ATURAN WAJIB:
 2. kata_jawa: kata Jawa autentik yang relevan tema
 3. ayat_arab: ayat/hadits sahih yang benar-benar relevan
 4. photo_queries: WAJIB scene visual nyata dalam bahasa Inggris, HARUS bernuansa Jawa/Indonesia (sawah, masjid, gunung, pasar tradisional, sungai Jawa, dll) DAN mengandung kata estetika terang: "bright", "soft light", "airy", "minimal", "clean", "morning". HINDARI: "dark", "night", "moody", "foreign", "western". Contoh untuk tema sabar: "bright Java rice field morning mist minimal", "soft light Indonesian mosque prayer hall", "airy Javanese river stones calm morning"
-5. hashtags: 7 string tanpa spasi tanpa #, campur Indonesia+Inggris, relevan tema, berpotensi viral di medsos. Contoh untuk sabar: ["KataSabar","SabarItuIndah","Patience","QuoteSabar","MotivasiIslam","HidupSabar","IslamicQuotes"]
+5. hashtags: TEPAT 3 string tanpa spasi tanpa #, pilih yang paling viral dan relevan tema. Contoh untuk sabar: ["KataSabar","SabarItuIndah","MotivasiIslam"]
 6. Semua nilai string harus VALID JSON — tidak boleh ada karakter yang merusak JSON`;
 }
 

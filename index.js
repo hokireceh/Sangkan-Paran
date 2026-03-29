@@ -159,8 +159,8 @@ async function kirimWisdomCard(chatId, tema, editMsgId = null) {
     await bot.sendChatAction(chatId, 'upload_photo');
 
     // Caption + hashtag
-    const BRAND_TAGS = ['SangkanParan', 'WisdomCard', 'KearifanLokal', 'QuoteJawa', 'MotivasiIslami', 'KataKata'];
-    const allTags    = [...(content.hashtags || []), ...BRAND_TAGS];
+    const BRAND_TAGS = ['SangkanParan', 'fyp'];
+    const allTags    = [...(content.hashtags || []).slice(0, 3), ...BRAND_TAGS];
     const hashtagLine = allTags.map(h => `#${h}`).join(' ');
 
     const kutipanLines = (content.kutipan_motivasi || '')
