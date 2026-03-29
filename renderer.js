@@ -77,8 +77,6 @@ function generateCardHTML(content, photoUrl) {
   const hasPhoto    = !!photoUrl;
   const kutipanSize = calcKutipanFontSize(content.kutipan_motivasi || '');
 
-  const noiseSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E")`;
-
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -86,9 +84,34 @@ function generateCardHTML(content, photoUrl) {
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Amiri:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body { width: 800px; height: 1200px; overflow: hidden; }
 
+  /* ── Background foto full-bleed ── */
+  .bg-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    z-index: 0;
+  }
+  .bg-fallback {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, #9b8ea8 0%, #7a7090 40%, #5a5070 100%);
+    z-index: 0;
+  }
+
+  /* ── Overlay semi-transparan di atas foto ── */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(245, 238, 225, 0.82);
+    z-index: 1;
+  }
+
+  /* ── Card container ── */
   .card {
     width: 800px;
     height: 1200px;
@@ -97,36 +120,17 @@ function generateCardHTML(content, photoUrl) {
     flex-direction: column;
     align-items: center;
     padding: 52px 72px 48px;
-    background-color: #c9a872;
-    background-image:
-      ${noiseSvg},
-      radial-gradient(ellipse at 15% 10%, rgba(255,240,190,0.55) 0%, transparent 45%),
-      radial-gradient(ellipse at 85% 85%, rgba(110,65,10,0.30) 0%, transparent 45%),
-      linear-gradient(170deg, #dfc08a 0%, #c9a06a 40%, #b8894e 70%, #c4a06a 100%);
+    overflow: hidden;
   }
 
-  /* Vignette sudut */
-  .card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 0%   0%,   rgba(90,50,5,0.18) 0%, transparent 50%),
-      radial-gradient(ellipse at 100% 0%,   rgba(90,50,5,0.14) 0%, transparent 50%),
-      radial-gradient(ellipse at 0%   100%, rgba(90,50,5,0.18) 0%, transparent 50%),
-      radial-gradient(ellipse at 100% 100%, rgba(90,50,5,0.18) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* ── Header ──────────────────────────────────── */
+  /* ── Header ── */
   .header {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    z-index: 1;
-    margin-bottom: 32px;
+    z-index: 2;
+    margin-bottom: 36px;
   }
   .diamond-icon { width: 34px; height: 34px; }
   .brand-name {
@@ -137,40 +141,39 @@ function generateCardHTML(content, photoUrl) {
     letter-spacing: 1.5px;
   }
 
-  /* ── Foto bingkai putih krem ─────────────────── */
+  /* ── Foto bingkai putih — sekarang thumbnail kecil di tengah ── */
   .photo-wrap {
-    z-index: 1;
+    z-index: 2;
     margin-bottom: 36px;
-    background: #f0e6cc;
-    padding: 10px;
-    box-shadow: 0 4px 16px rgba(60,30,5,0.30), 0 0 0 1px rgba(80,45,10,0.15);
-    width: 540px;
+    background: #fff;
+    padding: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
+    width: 560px;
   }
   .photo-wrap img {
     width: 100%;
-    height: 300px;
+    height: 310px;
     object-fit: cover;
     display: block;
-    filter: contrast(0.95) brightness(0.97);
   }
   .photo-placeholder {
     width: 100%;
-    height: 300px;
-    background: #b8954f;
+    height: 310px;
+    background: rgba(160,140,180,0.35);
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .photo-placeholder-text {
     font-family: 'Cinzel', serif;
-    color: rgba(255,235,180,0.55);
+    color: rgba(44,22,0,0.4);
     font-size: 13px;
     letter-spacing: 3px;
   }
 
-  /* ── ★ Kutipan Jawa — auto font-size ─────────── */
+  /* ── Kutipan Jawa ── */
   .kutipan {
-    z-index: 1;
+    z-index: 2;
     width: 100%;
     margin-bottom: 20px;
     text-align: center;
@@ -178,21 +181,20 @@ function generateCardHTML(content, photoUrl) {
   .kutipan-text {
     font-family: 'Lora', serif;
     font-weight: 700;
-    color: #1c0c00;
+    color: #1a0a00;
     line-height: 1.75;
     white-space: pre-wrap;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.12);
-    /* font-size diinjeksi via inline style */
+    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
   }
 
-  /* ── ★ Kata Jawa — sub-judul terpisah ────────── */
+  /* ── Kata Jawa ── */
   .kata-jawa-wrap {
-    z-index: 1;
+    z-index: 2;
     width: 100%;
     margin-bottom: 10px;
     text-align: center;
-    border-top: 1px solid rgba(70,38,5,0.20);
-    border-bottom: 1px solid rgba(70,38,5,0.20);
+    border-top: 1px solid rgba(44,22,0,0.18);
+    border-bottom: 1px solid rgba(44,22,0,0.18);
     padding: 12px 0;
   }
   .kata-jawa-label {
@@ -210,25 +212,25 @@ function generateCardHTML(content, photoUrl) {
     margin-top: 5px;
   }
 
-  /* ── Divider ornament ────────────────────────── */
+  /* ── Divider ── */
   .divider {
-    z-index: 1;
+    z-index: 2;
     width: 100%;
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 22px 0;
+    margin: 20px 0;
   }
   .divider-line {
     flex: 1;
     height: 1px;
-    background: linear-gradient(to right, transparent, rgba(70,38,5,0.35), transparent);
+    background: linear-gradient(to right, transparent, rgba(44,22,0,0.30), transparent);
   }
-  .divider-ornament { font-size: 13px; color: rgba(80,45,10,0.5); }
+  .divider-ornament { font-size: 13px; color: rgba(44,22,0,0.45); }
 
-  /* ── Arab, transliterasi, ★ arti_ayat ────────── */
+  /* ── Arab, transliterasi, arti_ayat ── */
   .arab-section {
-    z-index: 1;
+    z-index: 2;
     width: 100%;
     text-align: center;
   }
@@ -244,22 +246,21 @@ function generateCardHTML(content, photoUrl) {
     font-size: 14px;
     font-style: italic;
     color: #3a1e05;
-    margin-top: 4px;
+    margin-top: 6px;
   }
-  /* ★ arti_ayat tampil di bawah transliterasi */
   .arti-ayat {
     font-family: 'Lora', serif;
     font-size: 13px;
     font-style: italic;
     color: #5a3510;
-    margin-top: 5px;
+    margin-top: 6px;
     opacity: 0.88;
     padding: 0 8px;
   }
 
-  /* ── Footer ──────────────────────────────────── */
+  /* ── Footer ── */
   .footer {
-    z-index: 1;
+    z-index: 2;
     margin-top: auto;
     padding-top: 22px;
     text-align: center;
@@ -276,6 +277,15 @@ function generateCardHTML(content, photoUrl) {
 <body>
 <div class="card">
 
+  <!-- Background foto full-bleed -->
+  ${hasPhoto
+    ? `<img class="bg-photo" src="${photoUrl}" alt="bg" crossorigin="anonymous"/>`
+    : `<div class="bg-fallback"></div>`
+  }
+
+  <!-- Overlay putih transparan -->
+  <div class="overlay"></div>
+
   <!-- Header -->
   <div class="header">
     <svg class="diamond-icon" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -286,7 +296,7 @@ function generateCardHTML(content, photoUrl) {
     <div class="brand-name">Sangkan Paran</div>
   </div>
 
-  <!-- Foto bingkai putih krem -->
+  <!-- Foto bingkai putih -->
   <div class="photo-wrap">
     ${hasPhoto
       ? `<img src="${photoUrl}" alt="wisdom" crossorigin="anonymous"/>`
@@ -294,25 +304,25 @@ function generateCardHTML(content, photoUrl) {
     }
   </div>
 
-  <!-- ★ Kutipan Jawa — font-size otomatis -->
+  <!-- Kutipan Jawa -->
   <div class="kutipan">
     <div class="kutipan-text" style="font-size:${kutipanSize}">${content.kutipan_motivasi}</div>
   </div>
 
-  <!-- ★ Kata Jawa — sub-judul terpisah dengan border -->
+  <!-- Kata Jawa -->
   <div class="kata-jawa-wrap">
     <div class="kata-jawa-label">${content.kata_jawa}</div>
     <div class="kata-jawa-arti">${content.arti_jawa}</div>
   </div>
 
-  <!-- Divider ornament -->
+  <!-- Divider -->
   <div class="divider">
     <div class="divider-line"></div>
     <div class="divider-ornament">✦</div>
     <div class="divider-line"></div>
   </div>
 
-  <!-- Arab, transliterasi, ★ arti_ayat -->
+  <!-- Arab -->
   <div class="arab-section">
     <div class="arab-text">${content.ayat_arab}</div>
     <div class="transliterasi">[ ${content.transliterasi} ]</div>
