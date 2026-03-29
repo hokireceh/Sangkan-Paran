@@ -95,6 +95,7 @@ function generateCardHTML(content, photoUrl) {
     object-fit: cover;
     object-position: center;
     z-index: 0;
+    filter: brightness(1.12) saturate(0.8);
   }
   .bg-fallback {
     position: absolute;
@@ -107,7 +108,7 @@ function generateCardHTML(content, photoUrl) {
   .overlay {
     position: absolute;
     inset: 0;
-    background: rgba(245, 238, 225, 0.82);
+    background: rgba(250, 248, 245, 0.72);
     z-index: 1;
   }
 
