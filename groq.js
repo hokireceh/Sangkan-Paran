@@ -248,7 +248,9 @@ OUTPUT: JSON valid saja, tanpa teks lain di luar JSON.
 {
   "tema": "tema inti 1–4 kata bahasa Indonesia — BUKAN salin ulang input",
 
-  "kutipan_motivasi": "3–5 baris BAHASA JAWA NGOKO atau KRAMA MURNI, dipisah \\n. TIGA ATURAN MUTLAK: (1) JANGAN menyebut tema secara langsung — biarkan makna muncul sendiri dari gambaran yang kamu buat. (2) Gunakan perumpamaan konkret: alam, benda, kejadian sehari-hari — bukan kata abstrak. (3) Struktur bukan kalimat biasa — bisa berima, bisa patah-patah, bisa seperti gumaman. CONTOH BENAR untuk tema sabar: 'wit gedhang ora rubuh amung sak pisan\\nkena angin mung mlengkung\\nbali ngadeg maneh'. CONTOH SALAH: 'kudu sabar lan ikhlas supaya urip ayem' — ini ceramah, bukan petuah. KATA TERLARANG: kudu percaya, mesthi apik, tansah eling, selalu, tetap, harus, agar, supaya, dan semua kata bahasa Indonesia.",
+  "kutipan_motivasi": "Tulis langsung tanpa label apapun. Format: 2-3 baris kalimat utama, lalu SATU baris kosong, lalu 1 baris kicker diakhiri ':)'. JANGAN tulis BAGIAN 1, BAGIAN 2, tanda kutip, atau label apapun — langsung teksnya saja.\n\nCONTOH OUTPUT YANG BENAR (persis seperti ini):\nRaono dalan sing\nsempurno tanpo\npandungone wong tuo.\n\ndungo paling ampuh:)\n\nCONTOH LAIN:\nAlloh dengan mudah mengubah\nsiang jadi malam, apalagi\nsekedar mengubah hidupmu.\n\nhusnudzon ae terus karo Alloh:)\n\nCONTOH LAIN:\nWong pinter iso ngomong opo wae\ntapi wong bener\ntahu kapan kudu meneng.\n\nilmu tanpo akhlak, hampa:)\n\nATURAN: Kalimat utama = observasi konkret, JANGAN sebut tema langsung. Kicker = insight pendek yang benar-benar nyambung ke TEMA INI — jangan copy contoh kicker di atas.
+
+DIALEK: Jawa Timuran HALUS — bukan bahasa kasar Surabaya/Malang (jangan pakai: rek, cuk, jancuk, kon, sampean kasar). Gunakan bahasa Jawa yang hangat seperti orang Jombang, Kediri, Blitar, Madiun ngomong ke orang yang lebih tua sedikit: 'raono', 'tanpo', 'soko', 'ae', 'wes', 'nggak', 'karo', 'wong', 'opo', 'iso', 'ora', 'biyen', 'ngerti', 'nyambung'. BUKAN krama inggil kuno seperti 'tundhuké', 'ndadèk', 'wangsulé'.",
 
   "kata_jawa": "satu kata atau frasa Jawa asli yang paling tepat merangkum tema — BUKAN 'Sangkan Paran', BUKAN kata serapan umum",
 
@@ -396,11 +398,11 @@ function parseResponse(rawText, tema) {
     }
   }
 
-  // ── Warn: kutipan masih campur Indonesia ──
-  const INDO_IN_KUTIPAN = /\b(mau|gimana|atau|dengan|untuk|dari|kamu|aku|dia|ini|itu|tidak|sudah|akan|bisa|ada|jadi|agar|saja|tetap|selalu|dan|tapi|karena|kalau|emang|banget)\b/i;
-  if (INDO_IN_KUTIPAN.test(content.kutipan_motivasi)) {
-    console.warn('[WARN] kutipan_motivasi terdeteksi campur Indonesia:', content.kutipan_motivasi.slice(0, 80));
-  }
+  // ── Bersihkan label BAGIAN jika AI masih nulis literal ──
+  content.kutipan_motivasi = content.kutipan_motivasi
+    .replace(/BAGIANs*d+s*:s*/gi, '')
+    .replace(/^['"]|['"]$/gm, '')
+    .trimStart();
 
   // ── Warn: transliterasi tidak ada spasi ──
   if (content.transliterasi && !/\s/.test(content.transliterasi) && content.transliterasi.length > 12) {
@@ -507,4 +509,4 @@ module.exports = {
   invalidateCache,
   MODEL_TIERS,
   RANDOM_THEMES,
-};{ generateWisdomContent, MODEL_TIERS };
+};

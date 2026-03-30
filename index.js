@@ -21,7 +21,16 @@ function isAllowed(chatId) {
   return ALLOWED_IDS.has(Number(chatId));
 }
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+  polling: {
+    interval: 3000,
+    autoStart: true,
+    params: { timeout: 10, allowed_updates: ['message','callback_query'] },
+  },
+  request: {
+    agentOptions: { keepAlive: true, family: 4 },
+  },
+});
 console.log('🤖 Sangkan Paran Bot is running...');
 console.log(`🔒 Whitelist aktif: ${ALLOWED_IDS.size} user diizinkan`);
 

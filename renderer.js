@@ -1,12 +1,11 @@
 'use strict';
 
-const puppeteer   = require('puppeteer');
-const path        = require('path');
-const fs          = require('fs');
+const puppeteer    = require('puppeteer');
+const path         = require('path');
+const fs2          = require('fs');
 const { execSync } = require('child_process');
 const { fetchUnsplashPhoto } = require('./unsplash');
 
-// ─── Temukan Chromium sistem secara dinamis ───────────────────────────────────
 function findChromium() {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
   try {
@@ -19,7 +18,6 @@ function findChromium() {
 const CHROMIUM_PATH = findChromium();
 console.log('[INFO] Chromium path:', CHROMIUM_PATH || '(puppeteer bundled)');
 
-// ─── HTML escape — cegah content AI merusak struktur kartu ───────────────────
 function escapeHtml(str) {
   return String(str ?? '')
     .replace(/&/g,  '&amp;')
@@ -29,22 +27,41 @@ function escapeHtml(str) {
     .replace(/'/g,  '&#39;');
 }
 
-// ─── Auto font-size kutipan ───────────────────────────────────────────────────
-function calcKutipanFontSize(text = '') {
-  const lines  = text.split('\n');
-  const maxLen = Math.max(...lines.map(l => l.length));
-  const nLine  = lines.length;
-  if (maxLen > 32 || nLine > 4) return '19px';
-  if (maxLen > 24 || nLine > 3) return '22px';
-  return '26px';
-}
-
-// ─── Unique ID — aman untuk request bersamaan ─────────────────────────────────
 function makeUid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-// ─── Render kartu → PNG ───────────────────────────────────────────────────────
+// Split kutipan → main + kicker (dipisah \n\n)
+function splitKutipan(raw = '') {
+  const parts = raw.split(/\n\n+/);
+  if (parts.length >= 2) {
+    return {
+      main  : parts.slice(0, parts.length - 1).join('\n').trim(),
+      kicker: parts[parts.length - 1].trim(),
+    };
+  }
+  return { main: raw.trim(), kicker: '' };
+}
+
+// Auto font-size quote utama
+function calcMainFontSize(text = '') {
+  const lines  = text.split('\n');
+  const maxLen = Math.max(...lines.map(l => l.length));
+  const nLine  = lines.length;
+  if (maxLen > 38 || nLine > 4) return '20px';
+  if (maxLen > 28 || nLine > 3) return '23px';
+  return '27px';
+}
+
+// Auto font-size Arab — ayat panjang dapat font lebih kecil
+function calcArabFontSize(text = '') {
+  const len = text.length;
+  if (len > 120) return '28px';
+  if (len > 80)  return '34px';
+  if (len > 50)  return '40px';
+  return '46px';
+}
+
 async function renderCard(content, photoUrlOverride) {
   let photoUrl = photoUrlOverride || '';
   if (!photoUrl) {
@@ -60,51 +77,40 @@ async function renderCard(content, photoUrlOverride) {
   const tmpHtmlPath = path.join('/tmp', `card_${uid}.html`);
   const tmpPngPath  = path.join('/tmp', `card_${uid}.png`);
 
-  fs.writeFileSync(tmpHtmlPath, html, 'utf8');
+  fs2.writeFileSync(tmpHtmlPath, html, 'utf8');
 
   const browser = await puppeteer.launch({
     headless: 'new',
     ...(CHROMIUM_PATH ? { executablePath: CHROMIUM_PATH } : {}),
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--single-process',
-    ],
+    args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process'],
   });
 
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 1200, deviceScaleFactor: 2 });
     await page.goto(`file://${tmpHtmlPath}`, { waitUntil: 'networkidle0', timeout: 30000 });
-    await page.screenshot({
-      path    : tmpPngPath,
-      fullPage: false,
-      clip    : { x: 0, y: 0, width: 800, height: 1200 },
-    });
+    await page.screenshot({ path: tmpPngPath, fullPage: false, clip: { x: 0, y: 0, width: 800, height: 1200 } });
   } finally {
-    // Selalu tutup browser & hapus file HTML — bahkan saat error
     await browser.close();
-    try { fs.unlinkSync(tmpHtmlPath); } catch (_) {}
+    try { fs2.unlinkSync(tmpHtmlPath); } catch (_) {}
   }
 
   return tmpPngPath;
 }
 
-// ─── Generate HTML kartu ──────────────────────────────────────────────────────
 function generateCardHTML(content, photoUrl) {
-  const hasPhoto    = !!photoUrl;
-  const kutipanSize = calcKutipanFontSize(content.kutipan_motivasi || '');
+  const hasPhoto   = !!photoUrl;
+  const { main, kicker } = splitKutipan(content.kutipan_motivasi || '');
+  const mainSize   = calcMainFontSize(main);
+  const arabSize   = calcArabFontSize(content.ayat_arab || '');
 
-  // Escape semua field teks — aksara Arab tidak perlu di-escape (Unicode murni)
-  const kutipan      = escapeHtml(content.kutipan_motivasi);
-  const kataJawa     = escapeHtml(content.kata_jawa);
-  const artiJawa     = escapeHtml(content.arti_jawa);
-  const translitasi  = escapeHtml(content.transliterasi);
-  const artiAyat     = escapeHtml(content.arti_ayat);
-  // ayat_arab: aksara Arab aman, hanya escape karakter berbahaya saja
-  const ayatArab     = String(content.ayat_arab ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const mainEsc     = escapeHtml(main).replace(/\n/g, '<br>');
+  const kickerEsc   = escapeHtml(kicker);
+  const kataJawa    = escapeHtml(content.kata_jawa);
+  const artiJawa    = escapeHtml(content.arti_jawa);
+  const translitasi = escapeHtml(content.transliterasi);
+  const artiAyat    = escapeHtml(content.arti_ayat);
+  const ayatArab    = String(content.ayat_arab ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -117,206 +123,117 @@ function generateCardHTML(content, photoUrl) {
 
   /* ── Background foto full-bleed ── */
   .bg-photo {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
     z-index: 0;
-    filter: brightness(1.12) saturate(0.8);
+    filter: brightness(1.08) saturate(0.75);
   }
   .bg-fallback {
-    position: absolute;
-    inset: 0;
+    position: absolute; inset: 0;
     background: linear-gradient(160deg, #9b8ea8 0%, #7a7090 40%, #5a5070 100%);
     z-index: 0;
   }
 
-  /* ── Overlay semi-transparan di atas foto ── */
+  /* ── Overlay putih transparan ── */
   .overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(250, 248, 245, 0.72);
+    position: absolute; inset: 0;
+    background: rgba(252, 250, 246, 0.74);
     z-index: 1;
   }
 
   /* ── Card container ── */
   .card {
-    width: 800px;
-    height: 1200px;
+    width: 800px; height: 1200px;
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 52px 72px 48px;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 46px 68px 40px;
     overflow: hidden;
   }
 
   /* ── Header ── */
-  .header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    z-index: 2;
-    margin-bottom: 36px;
-  }
-  .diamond-icon { width: 34px; height: 34px; }
-  .brand-name {
-    font-family: 'Cinzel', serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #2c1600;
-    letter-spacing: 1.5px;
-  }
+  .header { display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 2; margin-bottom: 28px; }
+  .diamond-icon { width: 32px; height: 32px; }
+  .brand-name { font-family: 'Cinzel', serif; font-size: 17px; font-weight: 600; color: #2c1600; letter-spacing: 2px; }
 
-  /* ── Foto bingkai putih ── */
+  /* ── Foto ── */
   .photo-wrap {
-    z-index: 2;
-    margin-bottom: 36px;
-    background: #fff;
-    padding: 8px;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
-    width: 560px;
+    z-index: 2; margin-bottom: 16px;
+    background: #fff; padding: 7px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
+    width: 550px;
   }
-  .photo-wrap img {
-    width: 100%;
-    height: 310px;
-    object-fit: cover;
-    display: block;
-  }
+  .photo-wrap img { width: 100%; height: 270px; object-fit: cover; display: block; }
   .photo-placeholder {
-    width: 100%;
-    height: 310px;
-    background: rgba(160,140,180,0.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 100%; height: 295px; background: rgba(160,140,180,0.3);
+    display: flex; align-items: center; justify-content: center;
   }
-  .photo-placeholder-text {
-    font-family: 'Cinzel', serif;
-    color: rgba(44,22,0,0.4);
-    font-size: 13px;
-    letter-spacing: 3px;
+  .photo-placeholder-text { font-family: 'Cinzel', serif; color: rgba(44,22,0,0.35); font-size: 13px; letter-spacing: 3px; }
+
+  /* ── Quote utama — bold, center ── */
+  .quote-main {
+    z-index: 2; width: 100%; text-align: center;
+    margin-bottom: 6px;
+    font-family: 'Lora', serif; font-weight: 700;
+    font-size: ${mainSize};
+    color: #1a0800; line-height: 1.7;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    white-space: normal;
   }
 
-  /* ── Kutipan Jawa ── */
-  .kutipan {
-    z-index: 2;
-    width: 100%;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-  .kutipan-text {
-    font-family: 'Lora', serif;
-    font-weight: 700;
-    color: #1a0a00;
-    line-height: 1.75;
-    white-space: pre-wrap;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+  /* ── Kicker — italic kecil, rata kiri, beda karakter ── */
+  .quote-kicker {
+    z-index: 2; width: 100%;
+    text-align: left; padding-left: 4px;
+    margin-bottom: 12px;
+    font-family: 'Lora', serif; font-style: italic; font-weight: 400;
+    font-size: 14px; color: #7a5030; line-height: 1.5;
+    opacity: 0.75; font-weight: 400;
   }
 
   /* ── Kata Jawa ── */
-  .kata-jawa-wrap {
-    z-index: 2;
-    width: 100%;
-    margin-bottom: 10px;
-    text-align: center;
+  .kata-wrap {
+    z-index: 2; width: 100%; text-align: center;
     border-top: 1px solid rgba(44,22,0,0.18);
     border-bottom: 1px solid rgba(44,22,0,0.18);
-    padding: 12px 0;
+    padding: 10px 0; margin-bottom: 10px;
   }
-  .kata-jawa-label {
-    font-family: 'Cinzel', serif;
-    font-size: 19px;
-    font-weight: 600;
-    color: #2c1600;
-    letter-spacing: 1.5px;
-  }
-  .kata-jawa-arti {
-    font-family: 'Lora', serif;
-    font-size: 14px;
-    font-style: italic;
-    color: #5a3510;
-    margin-top: 5px;
-  }
+  .kata-label { font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600; color: #3c2610; letter-spacing: 1.5px; opacity: 0.85; }
+  .kata-arti  { font-family: 'Lora', serif; font-size: 13px; font-style: italic; color: #8b6040; margin-top: 4px; font-weight: 400; }
 
   /* ── Divider ── */
-  .divider {
-    z-index: 2;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 20px 0;
-  }
-  .divider-line {
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(to right, transparent, rgba(44,22,0,0.30), transparent);
-  }
-  .divider-ornament { font-size: 13px; color: rgba(44,22,0,0.45); }
+  .divider { z-index: 2; width: 100%; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, rgba(44,22,0,0.25), transparent); }
+  .divider-ornament { font-size: 12px; color: rgba(44,22,0,0.4); }
 
-  /* ── Arab, transliterasi, arti_ayat ── */
-  .arab-section {
-    z-index: 2;
-    width: 100%;
-    text-align: center;
-  }
+  /* ── Arab ── */
+  .arab-section { z-index: 2; width: 100%; text-align: center; }
   .arab-text {
     font-family: 'Amiri', serif;
-    font-size: 48px;
-    color: #180900;
-    line-height: 1.7;
-    direction: rtl;
+    font-size: ${arabSize};
+    color: #180900; line-height: 1.65; direction: rtl;
   }
-  .transliterasi {
-    font-family: 'Lora', serif;
-    font-size: 14px;
-    font-style: italic;
-    color: #3a1e05;
-    margin-top: 6px;
-  }
+  .transliterasi { font-family: 'Lora', serif; font-size: 12px; font-style: italic; color: #5a3e20; margin-top: 5px; opacity: 0.8; }
   .arti-ayat {
-    font-family: 'Lora', serif;
-    font-size: 13px;
-    font-style: italic;
-    color: #5a3510;
-    margin-top: 6px;
-    opacity: 0.88;
-    padding: 0 8px;
+    font-family: 'Lora', serif; font-size: 12px; font-style: italic;
+    color: #7a5530; margin-top: 4px; opacity: 0.75; padding: 0 4px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
 
   /* ── Footer ── */
-  .footer {
-    z-index: 2;
-    margin-top: auto;
-    padding-top: 22px;
-    text-align: center;
-  }
-  .footer-text {
-    font-family: 'Lora', serif;
-    font-size: 17px;
-    font-style: italic;
-    color: #2c1600;
-    letter-spacing: 1px;
-  }
+  .footer { z-index: 2; margin-top: 0; padding-top: 14px; text-align: center; }
+  .footer-text { font-family: 'Lora', serif; font-size: 15px; font-style: italic; color: #2c1600; letter-spacing: 1px; }
 </style>
 </head>
 <body>
 <div class="card">
 
-  <!-- Background foto full-bleed -->
   ${hasPhoto
     ? `<img class="bg-photo" src="${photoUrl}" alt="bg" crossorigin="anonymous"/>`
     : `<div class="bg-fallback"></div>`
   }
-
-  <!-- Overlay putih transparan -->
   <div class="overlay"></div>
 
-  <!-- Header -->
   <div class="header">
     <svg class="diamond-icon" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
       <polygon points="17,2 30,13 17,32 4,13" fill="none" stroke="#2c1600" stroke-width="1.6"/>
@@ -326,7 +243,6 @@ function generateCardHTML(content, photoUrl) {
     <div class="brand-name">Sangkan Paran</div>
   </div>
 
-  <!-- Foto bingkai putih -->
   <div class="photo-wrap">
     ${hasPhoto
       ? `<img src="${photoUrl}" alt="wisdom" crossorigin="anonymous"/>`
@@ -334,32 +250,26 @@ function generateCardHTML(content, photoUrl) {
     }
   </div>
 
-  <!-- Kutipan Jawa -->
-  <div class="kutipan">
-    <div class="kutipan-text" style="font-size:${kutipanSize}">${kutipan}</div>
+  <div class="quote-main">${mainEsc}</div>
+  ${kickerEsc ? `<div class="quote-kicker">${kickerEsc}</div>` : ''}
+
+  <div class="kata-wrap">
+    <div class="kata-label">${kataJawa}</div>
+    <div class="kata-arti">${artiJawa}</div>
   </div>
 
-  <!-- Kata Jawa -->
-  <div class="kata-jawa-wrap">
-    <div class="kata-jawa-label">${kataJawa}</div>
-    <div class="kata-jawa-arti">${artiJawa}</div>
-  </div>
-
-  <!-- Divider -->
   <div class="divider">
     <div class="divider-line"></div>
     <div class="divider-ornament">✦</div>
     <div class="divider-line"></div>
   </div>
 
-  <!-- Arab -->
   <div class="arab-section">
     <div class="arab-text">${ayatArab}</div>
     <div class="transliterasi">[ ${translitasi} ]</div>
     <div class="arti-ayat">"${artiAyat}"</div>
   </div>
 
-  <!-- Footer -->
   <div class="footer">
     <div class="footer-text">- Sangkan Paran -</div>
   </div>
