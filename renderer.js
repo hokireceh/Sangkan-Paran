@@ -7,16 +7,31 @@ const { execSync } = require('child_process');
 const { fetchUnsplashPhoto } = require('./unsplash');
 
 function findChromium() {
-  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+  // 1. Override manual via env
+  if (process.env.CHROMIUM_PATH) {
+    if (fs2.existsSync(process.env.CHROMIUM_PATH)) return process.env.CHROMIUM_PATH;
+    console.warn('[WARN] CHROMIUM_PATH dari env tidak ditemukan:', process.env.CHROMIUM_PATH);
+  }
+
+  // 2. Cari via `which` — validasi existsSync sebelum return
+  const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable'];
+  for (const bin of candidates) {
+    try {
+      const found = execSync(`which ${bin} 2>/dev/null`, { encoding: 'utf8' }).trim();
+      if (found && fs2.existsSync(found)) return found;
+    } catch { /* lanjut */ }
+  }
+
+  // 3. Fallback ke Puppeteer bundled Chrome
   try {
-    return execSync(
-      'which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome 2>/dev/null',
-      { encoding: 'utf8' }
-    ).trim();
-  } catch { return null; }
+    const bundled = puppeteer.executablePath();
+    if (bundled && fs2.existsSync(bundled)) return bundled;
+  } catch { /* lanjut */ }
+
+  return null;
 }
 const CHROMIUM_PATH = findChromium();
-console.log('[INFO] Chromium path:', CHROMIUM_PATH || '(puppeteer bundled)');
+console.log('[INFO] Chromium path:', CHROMIUM_PATH || '(tidak ditemukan — puppeteer auto-detect)');
 
 function escapeHtml(str) {
   return String(str ?? '')
