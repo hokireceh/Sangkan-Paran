@@ -110,7 +110,7 @@ function generateCardHTML(content, photoUrl) {
   const artiJawa    = escapeHtml(content.arti_jawa);
   const translitasi = escapeHtml(content.transliterasi);
   const artiAyat    = escapeHtml(content.arti_ayat);
-  const ayatArab    = String(content.ayat_arab ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ayatArab    = escapeHtml(content.ayat_arab);
 
   return `<!DOCTYPE html>
 <html lang="id">
