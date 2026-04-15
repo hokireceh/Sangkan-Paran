@@ -59,14 +59,14 @@ function splitKutipan(raw = '') {
 }
 
 // Auto font-size quote utama
-// Regular weight butuh ukuran lebih besar dari bold untuk kesan visual yang sama
+// font-weight 500 (medium) — ukuran lebih besar dari bold, lebih kecil dari pure regular
 function calcMainFontSize(text = '') {
   const lines  = text.split('\n');
   const maxLen = Math.max(...lines.map(l => l.length));
   const nLine  = lines.length;
-  if (maxLen > 38 || nLine > 4) return '22px';
-  if (maxLen > 28 || nLine > 3) return '26px';
-  return '30px';
+  if (maxLen > 38 || nLine > 4) return '23px';
+  if (maxLen > 28 || nLine > 3) return '27px';
+  return '32px';
 }
 
 // Auto font-size Arab — ayat panjang dapat font lebih kecil
@@ -163,7 +163,7 @@ function generateCardHTML(content, photoUrl) {
     width: 800px; height: 1200px;
     position: relative;
     display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-    padding: 46px 68px 40px;
+    padding: 44px 50px 38px;
     overflow: hidden;
   }
 
@@ -186,25 +186,25 @@ function generateCardHTML(content, photoUrl) {
   }
   .photo-placeholder-text { font-family: 'Cinzel', serif; color: rgba(44,22,0,0.35); font-size: 13px; letter-spacing: 3px; }
 
-  /* ── Quote utama — regular weight, rata kiri (seperti referensi) ── */
+  /* ── Quote utama — medium weight, rata kiri, napas lebar ── */
   .quote-main {
     z-index: 2; width: 100%; text-align: left;
-    margin-bottom: 6px;
-    font-family: 'Lora', serif; font-weight: 400;
+    margin-bottom: 4px;
+    font-family: 'Lora', serif; font-weight: 500;
     font-size: ${mainSize};
-    color: #1a0800; line-height: 1.75;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    color: #111111; line-height: 1.9;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.35);
     white-space: normal;
   }
 
-  /* ── Kicker — italic kecil, rata kiri, beda karakter ── */
+  /* ── Kicker — italic kecil, menjorok, casual ── */
   .quote-kicker {
     z-index: 2; width: 100%;
-    text-align: left; padding-left: 2px;
-    margin-bottom: 12px;
+    text-align: left; padding-left: 14px;
+    margin-bottom: 14px;
     font-family: 'Lora', serif; font-style: italic; font-weight: 400;
-    font-size: 14px; color: #7a5030; line-height: 1.5;
-    opacity: 0.75;
+    font-size: 13px; color: #6b4420; line-height: 1.5;
+    opacity: 0.80;
   }
 
   /* ── Kata Jawa ── */
