@@ -55,7 +55,6 @@ function isPhotoSafe(photo) {
 // ─── Search endpoint — lebih terkontrol dari /random ─────────────────────────
 function searchPhotos(query, accessKey, page = 1) {
   return new Promise((resolve, reject) => {
-    const encoded = encodeURIComponent(query);
     const params  = new URLSearchParams({
       query,
       orientation   : 'landscape',
