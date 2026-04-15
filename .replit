@@ -24,7 +24,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node index.js"
+args = "npm install && node index.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
