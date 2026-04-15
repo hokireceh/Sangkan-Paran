@@ -56,7 +56,17 @@ process.on('SIGINT',  () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // ─── State per user ───────────────────────────────────────────────────────────
-const userState = new Map();   // chatId → state string
+const userState     = new Map();   // chatId → state string
+const userStateTime = new Map();   // chatId → timestamp saat state diset
+
+function setState(chatId, state) {
+  userState.set(chatId, state);
+  userStateTime.set(chatId, Date.now());
+}
+function clearState(chatId) {
+  userState.delete(chatId);
+  userStateTime.delete(chatId);
+}
 
 // ─── Cooldown anti-spam ───────────────────────────────────────────────────────
 const COOLDOWN_MS = 12_000;
@@ -148,8 +158,8 @@ setInterval(() => {
   for (const [chatId, ts] of lastRequest) {
     if (now - ts > STALE_TTL) { lastRequest.delete(chatId); cleaned++; }
   }
-  for (const chatId of userState.keys()) {
-    if (!lastRequest.has(chatId)) { userState.delete(chatId); cleaned++; }
+  for (const [chatId, ts] of userStateTime) {
+    if (now - ts > STALE_TTL) { clearState(chatId); cleaned++; }
   }
   for (const chatId of userHistory.keys()) {
     if (!lastRequest.has(chatId)) { userHistory.delete(chatId); cleaned++; }
@@ -278,7 +288,7 @@ bot.onText(/\/start/, (msg) => {
   if (!isAllowed(chatId)) return; // ← whitelist check
 
   const nama = msg.from?.first_name || 'Sahabat';
-  userState.delete(chatId);
+  clearState(chatId);
 
   bot.sendMessage(chatId,
     `✨ *Selamat datang di Sangkan Paran Bot, ${nama}!*\n\n` +
@@ -296,7 +306,7 @@ bot.onText(/\/help/, (msg) => {
 });
 
 function handleHelp(chatId) {
-  userState.delete(chatId);
+  clearState(chatId);
   bot.sendMessage(chatId,
     `📖 *Panduan Sangkan Paran Bot*\n\n` +
     `🎴 *Buat Wisdom Card* — Ketik tema, bot buatkan kartu\n` +
@@ -324,7 +334,7 @@ bot.on('message', async (msg) => {
 
   // ── Buat Wisdom Card ──
   if (teks === MENU.BUAT_CARD) {
-    userState.set(chatId, 'waiting_tema');
+    setState(chatId, 'waiting_tema');
     return bot.sendMessage(chatId,
       `🎴 *Buat Wisdom Card*\n\nKetik tema yang kamu inginkan:\n_Contoh: sabar, rezeki, ikhlas, kerja keras_`,
       {
@@ -336,7 +346,7 @@ bot.on('message', async (msg) => {
 
   // ── Pilih Tema ──
   if (teks === MENU.PILIH_TEMA) {
-    userState.delete(chatId);
+    clearState(chatId);
     return bot.sendMessage(chatId,
       `📂 *Pilih Tema Wisdom Card*\n\nKetuk tema yang kamu inginkan:`,
       { parse_mode: 'Markdown', reply_markup: temaInlineKeyboard() }
@@ -345,7 +355,7 @@ bot.on('message', async (msg) => {
 
   // ── Random Card ──
   if (teks === MENU.RANDOM) {
-    userState.delete(chatId);
+    clearState(chatId);
     if (isOnCooldown(chatId)) return rejectCooldown(chatId);
     if (!acquireLock(chatId)) return rejectBusy(chatId);
     setCooldown(chatId);
@@ -354,7 +364,7 @@ bot.on('message', async (msg) => {
 
   // ── Riwayat Tema ──
   if (teks === MENU.HISTORY) {
-    userState.delete(chatId);
+    clearState(chatId);
     const hist = getHistory(chatId);
 
     if (hist.length === 0) {
@@ -384,7 +394,7 @@ bot.on('message', async (msg) => {
 
   // ── Tentang Bot ──
   if (teks === MENU.ABOUT) {
-    userState.delete(chatId);
+    clearState(chatId);
     const totalTema = Object.values(TEMA_KATEGORI).flat().length;
     const histCount = getHistory(chatId).length;
     return bot.sendMessage(chatId,
@@ -416,13 +426,13 @@ bot.on('message', async (msg) => {
 
   // ── Kembali ke menu ──
   if (teks === '« Kembali ke Menu') {
-    userState.delete(chatId);
+    clearState(chatId);
     return bot.sendMessage(chatId, '🏠 Menu utama:', mainMenuKeyboard);
   }
 
   // ── State: menunggu input tema ──
   if (state === 'waiting_tema') {
-    userState.delete(chatId);
+    clearState(chatId);
     if (isOnCooldown(chatId)) return rejectCooldown(chatId);
     if (!acquireLock(chatId)) return rejectBusy(chatId);
     setCooldown(chatId);
