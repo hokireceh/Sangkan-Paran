@@ -99,6 +99,14 @@ async function rejectCooldown(chatId, queryId = null) {
   );
 }
 
+// ─── Helper: tolak karena sedang diproses ────────────────────────────────────
+async function rejectBusy(chatId) {
+  return bot.sendMessage(chatId,
+    `⏳ Masih memproses permintaanmu sebelumnya, tunggu sebentar ya. 🙏`,
+    { parse_mode: 'Markdown' }
+  );
+}
+
 // ─── History tema per user ────────────────────────────────────────────────────
 const MAX_HISTORY = 20;
 const userHistory = new Map();
@@ -339,7 +347,7 @@ bot.on('message', async (msg) => {
   if (teks === MENU.RANDOM) {
     userState.delete(chatId);
     if (isOnCooldown(chatId)) return rejectCooldown(chatId);
-    if (!acquireLock(chatId)) return rejectCooldown(chatId);
+    if (!acquireLock(chatId)) return rejectBusy(chatId);
     setCooldown(chatId);
     return kirimWisdomCard(chatId, 'random');
   }
@@ -416,7 +424,7 @@ bot.on('message', async (msg) => {
   if (state === 'waiting_tema') {
     userState.delete(chatId);
     if (isOnCooldown(chatId)) return rejectCooldown(chatId);
-    if (!acquireLock(chatId)) return rejectCooldown(chatId);
+    if (!acquireLock(chatId)) return rejectBusy(chatId);
     setCooldown(chatId);
     return kirimWisdomCard(chatId, teks);
   }

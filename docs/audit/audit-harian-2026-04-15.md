@@ -10,7 +10,7 @@
 | No | File | Baris | Severity | Judul |
 |----|------|-------|----------|-------|
 | #1 | `groq.js` | 403 | ✅ FIXED | Regex `BAGIAN` strip broken — label tidak pernah terhapus |
-| #2 | `index.js` | 342 | 🟠 HIGH | Lock gagal tampilkan pesan cooldown yang salah (misleading UX) |
+| #2 | `index.js` | 342 | ✅ FIXED | Lock gagal tampilkan pesan cooldown yang salah (misleading UX) |
 | #3 | `index.js` | 143–148 | 🟡 MEDIUM | Cleanup stale hapus state user yang masih aktif (tidak pernah buat kartu) |
 | #4 | `renderer.js` | 113 | 🟡 MEDIUM | `ayat_arab` escaping tidak konsisten — `&` tidak di-escape |
 | #5 | `unsplash.js` | 62 | 🟢 LOW | Variable `encoded` dideklarasi tapi tidak pernah dipakai (dead code) |
