@@ -11,14 +11,21 @@ Bot Telegram yang menghasilkan **Wisdom Card** berisi kearifan lokal Jawa, dalil
 | `renderer.js` | Render HTML → PNG menggunakan Puppeteer |
 | `unsplash.js` | Fetch foto dari Unsplash API |
 
-## Commands Bot
+## Commands Bot (Slash Command)
 
-- `/start` — Selamat datang
-- `/wisdom [tema]` — Generate Wisdom Card
-- `/tema` — Pilih tema dari inline keyboard (4 kategori)
-- `/random` — Wisdom Card acak langsung
-- `/about` — Info & filosofi Sangkan Paran
-- `/help` — Panduan
+- `/start` — Selamat datang & buka menu utama
+- `/help` — Panduan penggunaan
+
+## Menu Bot (ReplyKeyboard — tombol "Menu" di text bar)
+
+Keyboard tersembunyi di belakang tombol **Menu** di text bar Telegram (`is_persistent: false`). User tap "Menu" untuk toggle:
+
+- 🎴 **Buat Wisdom Card** — Ketik tema, bot buatkan kartu
+- 📂 **Pilih Tema** — Pilih dari 25+ tema per 4 kategori via inline keyboard
+- 🎲 **Random Card** — Wisdom Card acak langsung
+- 📜 **Riwayat Tema** — Lihat & ulangi tema yang pernah dibuat
+- ℹ️ **Tentang Bot** — Filosofi & info Sangkan Paran
+- 📖 **Bantuan** — Panduan penggunaan
 
 ## Environment Variables
 
@@ -30,12 +37,14 @@ UNSPLASH_ACCESS_KEY=...
 
 ## Fitur
 
-- Inline keyboard untuk pilih tema dari kategori
-- Callback handler untuk tombol interaktif
+- ReplyKeyboard tersembunyi di tombol "Menu" bawaan Telegram (tidak persistent)
+- Inline keyboard untuk pilih tema dari 4 kategori
+- Callback handler untuk semua tombol interaktif
 - Auto-suggest saat user ketik teks bebas
 - Tombol ulang & random setelah kartu dikirim
-- 25+ tema dari 4 kategori (Spiritual, Kehidupan, Hubungan, Karakter)
-- `setMyCommands` untuk menu command Telegram resmi
+- Cooldown 12 detik + per-user request lock anti-spam
+- In-memory cache konten 30 menit per tema
+- Periodic cleanup stale Map setiap 1 jam
 
 ## Workflow
 

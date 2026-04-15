@@ -192,8 +192,8 @@ const mainMenuKeyboard = {
       [MENU.RANDOM,    MENU.HISTORY],
       [MENU.ABOUT,     MENU.HELP],
     ],
-    resize_keyboard: true,
-    persistent: true,
+    resize_keyboard : true,
+    is_persistent   : false,
   },
 };
 
