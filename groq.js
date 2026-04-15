@@ -400,7 +400,7 @@ function parseResponse(rawText, tema) {
 
   // ── Bersihkan label BAGIAN jika AI masih nulis literal ──
   content.kutipan_motivasi = content.kutipan_motivasi
-    .replace(/BAGIANs*d+s*:s*/gi, '')
+    .replace(/BAGIAN\s*\d+\s*:\s*/gi, '')
     .replace(/^['"]|['"]$/gm, '')
     .trimStart();
 
