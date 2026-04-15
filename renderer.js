@@ -59,13 +59,14 @@ function splitKutipan(raw = '') {
 }
 
 // Auto font-size quote utama
+// Regular weight butuh ukuran lebih besar dari bold untuk kesan visual yang sama
 function calcMainFontSize(text = '') {
   const lines  = text.split('\n');
   const maxLen = Math.max(...lines.map(l => l.length));
   const nLine  = lines.length;
-  if (maxLen > 38 || nLine > 4) return '20px';
-  if (maxLen > 28 || nLine > 3) return '23px';
-  return '27px';
+  if (maxLen > 38 || nLine > 4) return '22px';
+  if (maxLen > 28 || nLine > 3) return '26px';
+  return '30px';
 }
 
 // Auto font-size Arab — ayat panjang dapat font lebih kecil
@@ -176,22 +177,22 @@ function generateCardHTML(content, photoUrl) {
     z-index: 2; margin-bottom: 16px;
     background: #fff; padding: 7px;
     box-shadow: 0 5px 20px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
-    width: 550px;
+    width: 100%;
   }
-  .photo-wrap img { width: 100%; height: 270px; object-fit: cover; display: block; }
+  .photo-wrap img { width: 100%; height: 310px; object-fit: cover; display: block; }
   .photo-placeholder {
-    width: 100%; height: 295px; background: rgba(160,140,180,0.3);
+    width: 100%; height: 310px; background: rgba(160,140,180,0.3);
     display: flex; align-items: center; justify-content: center;
   }
   .photo-placeholder-text { font-family: 'Cinzel', serif; color: rgba(44,22,0,0.35); font-size: 13px; letter-spacing: 3px; }
 
-  /* ── Quote utama — bold, center ── */
+  /* ── Quote utama — regular weight, rata kiri (seperti referensi) ── */
   .quote-main {
-    z-index: 2; width: 100%; text-align: center;
+    z-index: 2; width: 100%; text-align: left;
     margin-bottom: 6px;
-    font-family: 'Lora', serif; font-weight: 700;
+    font-family: 'Lora', serif; font-weight: 400;
     font-size: ${mainSize};
-    color: #1a0800; line-height: 1.7;
+    color: #1a0800; line-height: 1.75;
     text-shadow: 0 1px 2px rgba(255,255,255,0.4);
     white-space: normal;
   }
@@ -199,11 +200,11 @@ function generateCardHTML(content, photoUrl) {
   /* ── Kicker — italic kecil, rata kiri, beda karakter ── */
   .quote-kicker {
     z-index: 2; width: 100%;
-    text-align: left; padding-left: 4px;
+    text-align: left; padding-left: 2px;
     margin-bottom: 12px;
     font-family: 'Lora', serif; font-style: italic; font-weight: 400;
     font-size: 14px; color: #7a5030; line-height: 1.5;
-    opacity: 0.75; font-weight: 400;
+    opacity: 0.75;
   }
 
   /* ── Kata Jawa ── */
